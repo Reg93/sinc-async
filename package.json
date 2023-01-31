@@ -8,6 +8,7 @@
     "images-downloader": "^1.0.3",
     "jszip": "^3.10.1",
     "node-fetch": "^2.6.8",
+    "node-zip": "^1.1.1",
     "request": "^2.88.2",
     "to-buffer": "^1.1.1"
   },

@@ -1,78 +1,106 @@
 const fetch = require("node-fetch");
 const fs = require("fs");
-const fsPromises = require("fs").promises;
 const archiver = require("archiver");
 const { randomInt } = require("crypto");
-const toBuffer = require("to-buffer");
 
 let start = null;
 let end = null;
 
-function saveCatPics(url) {
+function zipCatPics(url){
   start = new Date().getTime();
 
-  return new Promise((res, rej) => {
-    let arr = [];
-
-    for (let i = 0; i < 2; i++) {
-      fetch(url).then((response) => {
-        let name = `${randomInt(1, 100)}.png`;
-
-        if (response.status === 200) {
-          response.body.pipe(fs.createWriteStream(name));
-
-          arr.push(name);
-
-          if (arr.length > 1) {
-            res(arr);
-          } else {
-            return;
-          }
-        } else {
-          rej("Server doesn't answer");
-        }
-      });
-    }
-  });
-}
-
-saveCatPics("https://cataas.com/cat")
-  .then((res) => {
-    let buffs = [];
-    for (let i = 0; i < res.length; i++) {
-      fsPromises
-        .readFile(res[i])
-        .catch((err) => {
-          console.error("readFile caught error", err);
-        })
-        .then((res) => {
-          const buff = toBuffer(res);
-          return buff;
-        })
-        .catch((err) => {
-          console.error("toBuffer caught error", err);
-        })
-        .then(function (res) {
-          buffs.push(res);
-
-          if (buffs.length > 1) {
-            console.log(buffs);
-            const archive = archiver("zip");
-            archive.append(JSON.stringify(buffs[0]), { name: "pic.txt" });
-            archive.append(JSON.stringify(buffs[1]), { name: "pic1.txt" });
-            archive.finalize();
-            archive.pipe(fs.createWriteStream("./cats2.zip"));
-
-            end = new Date().getTime();
-            let timeOfProcess = end - start;
-            console.log("Process took:", timeOfProcess);
-          }
-        })
-        .catch((err) => {
-          console.error("Archiver caught error", err);
-        });
+  return new Promise((resolve, reject) => {
+    if(url){
+      resolve(url);
+    } else {
+      reject("No link!");
     }
   })
-  .catch((err) => {
-    console.error("Promise caught error", err);
-  });
+}
+
+zipCatPics("https://cataas.com/cat")
+  .then(res => {
+    return new Promise((resolve, reject) => {
+      Promise.all([getPic(res), getPic(res)])
+      .then(res => {
+        resolve(res)
+      })
+      .catch(err => {
+        reject(err);
+      })
+    })
+  })
+  .catch(err => {
+    console.error(err);
+  })
+  .then(res => {
+    return new Promise((resolve, reject) => {
+      Promise.all([readFile(res[0]), readFile(res[1])])
+        .then(res => {
+          resolve(res)
+        })
+        .catch(err => {
+          reject(err);
+        })
+    })
+  })
+  .catch(err => {
+    console.error(err);
+  })
+  .then(res => {
+    const output = fs.createWriteStream("./cats2.zip");
+    const archive = archiver("zip");
+    archive.append(JSON.stringify(res[0]), { name: "pic.txt" });
+    archive.append(JSON.stringify(res[1]), { name: "pic1.txt" });
+    archive.finalize();
+    archive.pipe(output);
+    output.on("end", () => {});
+    output.on('close', () => {});
+  })
+  .catch(err => {
+    console.error("Archiver caught error", err);
+  })
+  .then(stopTime);
+
+
+
+function getPic(url){
+  let name = `${randomInt(1, 100)}.png`;
+
+  return new Promise((resolve, reject) => {
+    fetch(url).then(res => {
+
+      if(res.status === 200){
+        const stream = fs.createWriteStream(name);
+        res.body.pipe(stream);
+        stream.on("finish", () => {
+          resolve(name);
+        })
+        stream.on("error", () => {
+          reject("File was not written")
+        })
+      } else {
+        reject("Server does not answer");
+      }
+    })
+  })
+}
+
+function readFile(name){
+  return new Promise((res, rej) => {
+    fs.readFile(name, (err, data) => {
+      if(err){
+        rej("readFile caught error", err);
+      } else {
+        res(data);
+      }
+    })
+  })
+}
+
+function stopTime(){
+  end = new Date().getTime();
+  let timeOfProcess = end - start;
+  console.log("Process took:", timeOfProcess);
+}
+  

@@ -6,71 +6,115 @@ const { randomInt } = require("crypto");
 let start = null;
 let end = null;
 
-function getCatPics(url, callback) {
+function zipCatPics(url, callback){
   start = new Date().getTime();
-  let names = [];
+  let data = { url: url, names: [], pic: null, files: []};
+  callback(data, catchErrorForRequest);
+}
 
-  for (let i = 0; i < 2; i++) {
-    let name = `${randomInt(1, 100)}.png`;
+function getPic(data, callback) {
+  request(data.url, { encoding: "binary" }, function (err, res, body) {
+    let msg = null;
 
-    request(url, { encoding: "binary" }, function (err, res, body) {
-      if (err) {
-        console.error("request err server does not answer", err);
-      }
-      fs.writeFile(name, body, "binary", function (err) {
-        if (err) {
-          console.error("writeFile err", err);
-        }
-
-        names.push(name);
-        if (names.length > 1) {
-          callback(names, makeZip);
-        }
-      });
-    });
-    
-    if(i > 1){
-      return;
+    if(res.statusCode !== 200){
+      msg = "Server does not answer";
+    } else if(err) {
+      msg = "Request caught error" + err;
     }
+
+    data.pic = body;
+    callback(msg, data, writeFile);
+  });
+}
+
+function catchErrorForRequest(msg, data, callback){
+  if(msg){
+    console.error(msg);
+  } else {
+    callback(data, catchErrorForWriteFile);
   }
 }
 
-function readFiles(names, callback) {
-  let files = [];
+function writeFile(data, callback){
+  let name = `${randomInt(1, 100)}.png`;
+  data.names.push(name);
+  fs.writeFile(name, data.pic, "binary", (err) => {
+    callback(err, data, readFiles);
+  });
+}
 
-  for (let i = 0; i < names.length; i++) {
-    fs.readFile(`./${names[i]}`, (err, data) => {
-      files.push(data);
-
-      if (err) {
-        console.error("readFile err", err);
-      } else if (files.length > 1) {
-        callback(files);
-      }
-    });
+function catchErrorForWriteFile(err, data, callback){
+  if(err){
+    console.error("writeFile caught error", err);
+  } else {
+    callback(data, catchErrorForReadFiles);
   }
 }
 
-function makeZip(pics) {
-  const archive = archiver("zip");
+function readFiles(data, callback) {
+  let name = null;
+  if(data.names.length < 2){
+    name = data.names[0];
+  } else {
+    name = data.names[1];
+  }
 
-  archive.append(JSON.stringify(pics[0]), { name: "pic.txt" });
-  archive.append(JSON.stringify(pics[1]), { name: "pic2.txt" });
-
-  archive.on("error", function (err) {
-    console.error("archive err", err);
+  fs.readFile(`./${name}`, (err, res) => {
+    data.files.push(res);
+      callback(err, data, makeZip);
   });
 
-  archive.finalize();
-  archive.pipe(
-    fs.createWriteStream("cats.zip", "", (err) => {
-      console.error("createWriteStream err", err);
-    })
-  );
+}
 
+function catchErrorForReadFiles(err, data, callback){
+  if(err){
+    console.error("readFile caught error", err);
+  } else {
+    callback(data, getPic, stopTime, cheackErrorForMakeZip);
+  }
+}
+
+function makeZip(data, getPic, stopTime, callback) {
+  if(data.files.length < 2){
+    getPic(data, catchErrorForRequest);
+  } else {
+    let msg = null;
+    const archive = archiver("zip");
+    const output = fs.createWriteStream("cats.zip");
+
+    archive.append(JSON.stringify(data.files[0]), { name: "pic.txt" });
+    archive.append(JSON.stringify(data.files[1]), { name: "pic2.txt" });
+
+    archive.on("error", (err) => {
+      msg = "archive error";
+      callback(err, msg);
+    });
+    archive.on("warning", (err) => {
+      msg = "archive warning";
+      callback(err, msg);
+    });
+
+    archive.finalize();
+    archive.pipe(output);
+    output.on("error", () => {
+      msg = "createWriteStream error";
+      callback(err, msg);
+    })
+    output.on('end', () => {});
+    output.on('close', () => {stopTime()});
+  }
+}
+
+function cheackErrorForMakeZip(err, msg){
+  if(err){
+    console.error(msg, err);
+  }
+}
+
+function stopTime(){
   end = new Date().getTime();
   let timeOfProcess = end - start;
   console.log("Process took:", timeOfProcess);
 }
 
-getCatPics("https://cataas.com/cat", readFiles);
+zipCatPics("https://cataas.com/cat", getPic);
