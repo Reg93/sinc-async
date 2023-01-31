@@ -13,7 +13,7 @@ function zipCatPics(url){
     if(url){
       resolve(url);
     } else {
-      reject("No link!");
+      reject("zipCatPics error, no link!");
     }
   })
 }
@@ -87,12 +87,12 @@ function getPic(url){
 }
 
 function readFile(name){
-  return new Promise((res, rej) => {
+  return new Promise((resolve, reject) => {
     fs.readFile(name, (err, data) => {
       if(err){
-        rej("readFile caught error", err);
+        reject("readFile caught error", err);
       } else {
-        res(data);
+        resolve(data);
       }
     })
   })
