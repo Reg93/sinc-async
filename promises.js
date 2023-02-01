@@ -60,7 +60,7 @@ zipCatPics("https://cataas.com/cat")
   .catch(err => {
     console.error("Archiver caught error", err);
   })
-  .then(stopTime);
+  .then(stopTime());
 
 
 
@@ -74,7 +74,7 @@ function getPic(url){
         const stream = fs.createWriteStream(name);
         res.body.pipe(stream);
         stream.on("finish", () => {
-          resolve(name);
+        resolve(name);
         })
         stream.on("error", () => {
           reject("File was not written")
