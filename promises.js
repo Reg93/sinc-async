@@ -60,7 +60,7 @@ zipCatPics("https://cataas.com/cat")
   .catch(err => {
     console.error("Archiver caught error", err);
   })
-  .then(stopTime());
+  .then(stopTime);
 
 
 
